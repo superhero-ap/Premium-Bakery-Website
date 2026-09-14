@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Pencil, Plus, Save, Trash2 } from 'lucide-react'
-import { categories as demoCategories, products as demoProducts, type Product } from '../../data/demo'
+import { products as demoProducts, type Product } from '../../data/demo'
 import { supabase } from '../../lib/supabase'
 
 type Row = {
@@ -37,15 +37,17 @@ function ProductForm({ id }: { id?: string }) {
     let alive = true
     const load = async () => {
       if (!supabase) { setLoading(false); return }
-      const [{ data: categoryRows }, productResult] = await Promise.all([
-        supabase.from('categories').select('id,name').order('sort_order').order('name'),
-        id ? supabase.from('products').select('category_id,name,slug,short_description,description,base_price,compare_at_price,is_featured,is_best_seller,is_available,is_active,sort_order').eq('id', id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-      ])
+      const { data: categoryRows } = await supabase.from('categories').select('id,name').order('sort_order').order('name')
+      let productData: Row | null = null
+      if (id && !id.startsWith('demo-')) {
+        const result = await supabase.from('products').select('category_id,name,slug,short_description,description,base_price,compare_at_price,is_featured,is_best_seller,is_available,is_active,sort_order').eq('id', id).maybeSingle()
+        productData = result.data as Row | null
+      }
       if (!alive) return
       setCats(categoryRows ?? [])
-      if (productResult.data) setForm({ ...blank, ...productResult.data })
-      else if (id) {
-        const demo = demoProducts.find(p => p.slug === id)
+      if (productData) setForm({ ...blank, ...productData })
+      else if (id?.startsWith('demo-')) {
+        const demo = demoProducts.find(p => `demo-${p.slug}` === id)
         if (demo) setForm({ ...blank, ...demoToRow(demo) })
       }
       setLoading(false)
@@ -57,9 +59,10 @@ function ProductForm({ id }: { id?: string }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (!supabase) { setMessage('Supabase is not configured. Demo mode is read-only.'); return }
+    if (id?.startsWith('demo-')) { setMessage('Demo catalogue items are read-only. Create a live product after connecting Supabase.'); return }
     if (form.name.trim().length < 2 || form.base_price < 0) { setMessage('Enter a product name and a valid price.'); return }
     setSaving(true); setMessage('')
-    const payload = { ...form, name: form.name.trim(), slug: form.slug.trim() || slugify(form.name), base_price: Number(form.base_price), compare_at_price: form.compare_at_price === null || form.compare_at_price === '' ? null : Number(form.compare_at_price), short_description: form.short_description?.trim() || null, description: form.description?.trim() || null }
+    const payload = { ...form, name: form.name.trim(), slug: form.slug.trim() || slugify(form.name), base_price: Number(form.base_price), compare_at_price: form.compare_at_price === null ? null : Number(form.compare_at_price), short_description: form.short_description?.trim() || null, description: form.description?.trim() || null }
     const result = id ? await supabase.from('products').update(payload).eq('id', id) : await supabase.from('products').insert(payload)
     setSaving(false)
     if (result.error) { setMessage(result.error.message); return }
@@ -67,7 +70,7 @@ function ProductForm({ id }: { id?: string }) {
   }
 
   if (loading) return <div className="page"><div className="container narrow simple"><h1>Loading product…</h1></div></div>
-  return <div className="page"><div className="container narrow"><div className="page-title"><Link to="/admin/products" className="text-btn"><ArrowLeft size={16}/> Products</Link><div className="eyebrow">ADMIN / PRODUCTS</div><h1>{id ? 'Edit product' : 'New product'}</h1><p>Changes are saved to Supabase when an authenticated owner/admin account is configured.</p></div><form className="checkout" onSubmit={submit}><div className="form-grid"><label>Name *<input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value, slug: form.slug || slugify(e.target.value) })}/></label><label>Slug *<input required value={form.slug} onChange={e => setForm({ ...form, slug: slugify(e.target.value) })}/></label><label>Base price (INR) *<input required min="0" type="number" value={form.base_price} onChange={e => setForm({ ...form, base_price: Number(e.target.value) })}/></label><label>Compare-at price<input min="0" type="number" value={form.compare_at_price ?? ''} onChange={e => setForm({ ...form, compare_at_price: e.target.value ? Number(e.target.value) : null })}/></label><label>Category<select value={form.category_id ?? ''} onChange={e => setForm({ ...form, category_id: e.target.value || null })}><option value="">Uncategorised</option>{cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Sort order<input type="number" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: Number(e.target.value) })}/></label></div><label>Short description<textarea value={form.short_description ?? ''} onChange={e => setForm({ ...form, short_description: e.target.value })}/></label><label>Description<textarea value={form.description ?? ''} onChange={e => setForm({ ...form, description: e.target.value })}/></label><div className="form-grid checks"><label><input type="checkbox" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })}/> Featured</label><label><input type="checkbox" checked={form.is_best_seller} onChange={e => setForm({ ...form, is_best_seller: e.target.checked })}/> Best seller</label><label><input type="checkbox" checked={form.is_available} onChange={e => setForm({ ...form, is_available: e.target.checked })}/> Available</label><label><input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })}/> Active</label></div>{message && <div className="info-note" role="alert">{message}</div>}<button className="btn primary" disabled={saving}>{saving ? 'Saving…' : <><Save size={17}/> Save product</>}</button></form></div></div>
+  return <div className="page"><div className="container narrow"><div className="page-title"><Link to="/admin/products" className="text-btn"><ArrowLeft size={16}/> Products</Link><div className="eyebrow">ADMIN / PRODUCTS</div><h1>{id ? 'Edit product' : 'New product'}</h1><p>Changes are saved to Supabase for authenticated owner/admin accounts.</p></div><form className="checkout" onSubmit={submit}><div className="form-grid"><label>Name *<input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value, slug: form.slug || slugify(e.target.value) })}/></label><label>Slug *<input required value={form.slug} onChange={e => setForm({ ...form, slug: slugify(e.target.value) })}/></label><label>Base price (INR) *<input required min="0" type="number" value={form.base_price} onChange={e => setForm({ ...form, base_price: Number(e.target.value) })}/></label><label>Compare-at price<input min="0" type="number" value={form.compare_at_price ?? ''} onChange={e => setForm({ ...form, compare_at_price: e.target.value ? Number(e.target.value) : null })}/></label><label>Category<select value={form.category_id ?? ''} onChange={e => setForm({ ...form, category_id: e.target.value || null })}><option value="">Uncategorised</option>{cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Sort order<input type="number" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: Number(e.target.value) })}/></label></div><label>Short description<textarea value={form.short_description ?? ''} onChange={e => setForm({ ...form, short_description: e.target.value })}/></label><label>Description<textarea value={form.description ?? ''} onChange={e => setForm({ ...form, description: e.target.value })}/></label><div className="form-grid checks"><label><input type="checkbox" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })}/> Featured</label><label><input type="checkbox" checked={form.is_best_seller} onChange={e => setForm({ ...form, is_best_seller: e.target.checked })}/> Best seller</label><label><input type="checkbox" checked={form.is_available} onChange={e => setForm({ ...form, is_available: e.target.checked })}/> Available</label><label><input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })}/> Active</label></div>{message && <div className="info-note" role="alert">{message}</div>}<button className="btn primary" disabled={saving}>{saving ? 'Saving…' : <><Save size={17}/> Save product</>}</button></form></div></div>
 }
 
 export function ProductList() {
