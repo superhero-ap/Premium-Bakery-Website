@@ -17,7 +17,8 @@ Status legend: NOT STARTED / IN PROGRESS / IMPLEMENTED / VERIFIED / BLOCKED
 | Supabase schema + RLS | IMPLEMENTED | Private customer/admin data protected by policies |
 | Supabase Auth + roles | IMPLEMENTED | Owner/admin/manager/staff gate |
 | Admin dashboard routes | IMPLEMENTED | Dashboard and management areas are scaffolded |
-| Admin CRUD persistence | IN PROGRESS | Some admin areas still show demo/readiness states |
+| Admin product CRUD persistence | VERIFIED | Products can be listed, created, edited and deactivated through Supabase; demo fallback stays read-only |
+| Admin CRUD persistence (other areas) | IN PROGRESS | Categories, orders, custom cakes, offers, gallery, settings and team still need their dedicated CRUD/read workflows |
 | Gallery/lightbox management | IN PROGRESS | Storage schema/policies are ready |
 | Dynamic DB-driven storefront content | IN PROGRESS | Demo fallback currently remains primary when Supabase is unconfigured |
 | SEO metadata + structured data | IN PROGRESS | robots/sitemap present; route-level metadata needs final pass |
@@ -26,5 +27,6 @@ Status legend: NOT STARTED / IN PROGRESS / IMPLEMENTED / VERIFIED / BLOCKED
 | Analytics | NOT STARTED | Optional; no hardcoded tracking ID |
 | Payments | BLOCKED | Disabled by default until real provider credentials are configured |
 | Real business contact/ordering details | BLOCKED | Must be supplied/verified by client; current demo config intentionally contains blanks |
-| CI lint/typecheck/tests/build | IN PROGRESS | Lint/typecheck/tests pass; build fixes are being verified |
+| CI lint/typecheck/tests/build | VERIFIED | Latest CI run passed install, lint, typecheck, tests and production build |
+| GitHub Pages deployment | VERIFIED | Latest previously successful Pages deployment completed; current changes are queued for the next Pages run |
 | Local hosting | NOT STARTED | Intentionally deferred per user request |
