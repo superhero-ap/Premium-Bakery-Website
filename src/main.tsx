@@ -8,6 +8,7 @@ import './account.css'
 import App from './App'
 import CartCountSync from './components/CartCountSync'
 import CustomerAccountHost from './components/CustomerAccountHost'
+import CheckoutOrderSync from './components/CheckoutOrderSync'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -15,6 +16,7 @@ createRoot(document.getElementById('root')!).render(
       <App />
       <CartCountSync />
       <CustomerAccountHost />
+      <CheckoutOrderSync />
     </BrowserRouter>
   </StrictMode>,
 )
