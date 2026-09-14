@@ -31,12 +31,35 @@ export default function CartCountSync() {
       }
     }
 
+    const animateAdd = (event: Event) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const button = target.closest<HTMLButtonElement>('.add-btn')
+      if (!button) return
+      const card = button.closest<HTMLElement>('.product-card')
+      const mobileCart = document.querySelector<HTMLElement>('.mobile-bar a[href$="/cart"], .mobile-bar a[href$="/cart/"]')
+      button.classList.remove('is-added')
+      card?.classList.remove('is-added')
+      mobileCart?.classList.remove('cart-pulse')
+      void button.offsetWidth
+      button.classList.add('is-added')
+      card?.classList.add('is-added')
+      mobileCart?.classList.add('cart-pulse')
+      window.setTimeout(() => {
+        button.classList.remove('is-added')
+        card?.classList.remove('is-added')
+        mobileCart?.classList.remove('cart-pulse')
+      }, 950)
+    }
+
     sync()
     const timer = window.setInterval(sync, 250)
     window.addEventListener('storage', sync)
+    document.addEventListener('click', animateAdd)
     return () => {
       window.clearInterval(timer)
       window.removeEventListener('storage', sync)
+      document.removeEventListener('click', animateAdd)
     }
   }, [])
 
