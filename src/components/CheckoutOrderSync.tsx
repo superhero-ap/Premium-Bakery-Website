@@ -22,13 +22,10 @@ const setField = (root: ParentNode, keyword: string, value: string) => {
   input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-function closeAccountModal() {
-  document.getElementById('checkout-account-modal')?.remove()
-}
+function closeAccountModal() { document.getElementById('checkout-account-modal')?.remove() }
 
 async function showAccountModal(): Promise<boolean> {
-  if (!supabase) return false
-  if (document.getElementById('checkout-account-modal')) return false
+  if (!supabase || document.getElementById('checkout-account-modal')) return false
   return new Promise((resolve) => {
     const modal = document.createElement('div')
     modal.id = 'checkout-account-modal'
@@ -42,19 +39,19 @@ async function showAccountModal(): Promise<boolean> {
         <h2>Save your details for easier ordering.</h2>
         <p class="form-hint">Sign in with your email and password, or create an account. No OTP is requested by this checkout.</p>
         <div class="checkout-account-tabs"><button type="button" data-mode="signin" class="active">Sign in</button><button type="button" data-mode="signup">Create account</button></div>
-        <div class="checkout-account-fields">
-          <label>Email *<input data-account="email" type="email" autocomplete="email" placeholder="you@example.com"></label>
-          <label data-signup-only>Full name *<input data-account="name" autocomplete="name" placeholder="Your name"></label>
-          <label data-signup-only>Phone *<input data-account="phone" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile number"></label>
-          <label>Password *<input data-account="password" type="password" autocomplete="current-password" placeholder="At least 8 characters"></label>
-          <label data-signup-only>Confirm password *<input data-account="confirm" type="password" autocomplete="new-password" placeholder="Repeat password"></label>
-        </div>
-        <p class="checkout-account-error" role="alert"></p>
-        <button type="button" class="btn primary full" data-account-submit>Sign in</button>
-        <button type="button" class="text-btn" data-account-cancel>Continue later</button>
+        <form class="checkout-account-fields" data-account-form>
+          <label>Email *<input data-account="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+          <label data-signup-only>Full name *<input data-account="name" autocomplete="name" placeholder="Your name" minlength="2" required></label>
+          <label data-signup-only>Phone *<input data-account="phone" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile number" required></label>
+          <label>Password *<input data-account="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" minlength="8" required></label>
+          <label data-signup-only>Confirm password *<input data-account="confirm" type="password" autocomplete="new-password" placeholder="Repeat password" minlength="8" required></label>
+          <div class="checkout-account-error" role="alert" aria-live="polite"></div>
+          <button type="submit" class="btn primary full" data-account-submit>Sign in &amp; continue</button>
+          <button type="button" class="text-btn" data-account-cancel>Continue later</button>
+        </form>
       </div>`
     document.body.appendChild(modal)
-    const card = modal.querySelector('.checkout-account-card') as HTMLElement
+    const form = modal.querySelector('[data-account-form]') as HTMLFormElement
     const error = modal.querySelector('.checkout-account-error') as HTMLElement
     const submit = modal.querySelector('[data-account-submit]') as HTMLButtonElement
     const signupFields = Array.from(modal.querySelectorAll('[data-signup-only]')) as HTMLElement[]
@@ -64,6 +61,9 @@ async function showAccountModal(): Promise<boolean> {
       mode = next
       modal.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => button.classList.toggle('active', button.dataset.mode === mode))
       signupFields.forEach((node) => { node.style.display = mode === 'signup' ? '' : 'none' })
+      signupFields.forEach((node) => node.querySelector('input')?.toggleAttribute('required', mode === 'signup'))
+      const password = modal.querySelector<HTMLInputElement>('[data-account="password"]')
+      if (password) password.autocomplete = mode === 'signup' ? 'new-password' : 'current-password'
       submit.textContent = mode === 'signup' ? 'Create account & continue' : 'Sign in & continue'
       error.textContent = ''
     }
@@ -73,36 +73,33 @@ async function showAccountModal(): Promise<boolean> {
     modal.querySelector('.checkout-account-backdrop')?.addEventListener('click', () => finish(false))
     modal.querySelector('[data-account-cancel]')?.addEventListener('click', () => finish(false))
 
-    submit.addEventListener('click', async () => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
       error.textContent = ''
-      const email = (modal.querySelector('[data-account="email"]') as HTMLInputElement).value.trim().toLowerCase()
-      const password = (modal.querySelector('[data-account="password"]') as HTMLInputElement).value
-      if (!email || !email.includes('@') || password.length < 8) { error.textContent = 'Enter a valid email and a password of at least 8 characters.'; return }
+      if (!form.reportValidity()) return
+      const email = modal.querySelector<HTMLInputElement>('[data-account="email"]')!.value.trim().toLowerCase()
+      const password = modal.querySelector<HTMLInputElement>('[data-account="password"]')!.value
+      if (password.length < 8) { error.textContent = 'Password must be at least 8 characters.'; return }
       submit.disabled = true
-      submit.textContent = 'Please wait…'
+      submit.textContent = mode === 'signup' ? 'Creating account…' : 'Signing in…'
       try {
         if (mode === 'signin') {
           const result = await supabase.auth.signInWithPassword({ email, password })
           if (result.error) throw result.error
         } else {
-          const name = (modal.querySelector('[data-account="name"]') as HTMLInputElement).value.trim()
-          const phone = (modal.querySelector('[data-account="phone"]') as HTMLInputElement).value.replace(/\D/g, '')
-          const confirm = (modal.querySelector('[data-account="confirm"]') as HTMLInputElement).value
+          const name = modal.querySelector<HTMLInputElement>('[data-account="name"]')!.value.trim()
+          const phone = modal.querySelector<HTMLInputElement>('[data-account="phone"]')!.value.replace(/\D/g, '')
+          const confirm = modal.querySelector<HTMLInputElement>('[data-account="confirm"]')!.value
           if (name.length < 2) throw new Error('Enter your full name.')
           if (!/^[6-9]\d{9}$/.test(phone)) throw new Error('Enter a valid 10-digit Indian mobile number.')
           if (password !== confirm) throw new Error('Passwords do not match.')
           const result = await supabase.auth.signUp({ email, password, options: { data: { full_name: name, phone } } })
           if (result.error) throw result.error
-          if (!result.data.session) throw new Error('Account created, but email confirmation is enabled in Supabase. Disable email confirmation to allow password-only signup without OTP/email verification.')
+          if (!result.data.session) throw new Error('Account created, but Supabase email confirmation is enabled. Turn off email confirmation in Authentication settings to keep this checkout password-only.')
+          await supabase.from('customer_profiles').upsert({ id: result.data.user?.id, full_name: name, phone }, { onConflict: 'id' })
         }
         const { data: sessionData } = await supabase.auth.getSession()
-        const user = sessionData.session?.user
-        if (!user) throw new Error('Your account session could not be created. Please sign in again.')
-        const name = (modal.querySelector('[data-account="name"]') as HTMLInputElement | null)?.value.trim()
-        const phone = (modal.querySelector('[data-account="phone"]') as HTMLInputElement | null)?.value.replace(/\D/g, '')
-        if (mode === 'signup' && name && phone) {
-          await supabase.from('customer_profiles').upsert({ id: user.id, full_name: name, phone }, { onConflict: 'id' })
-        }
+        if (!sessionData.session?.user) throw new Error('Account was created, but no active session was returned. Please sign in again.')
         finish(true)
       } catch (err) {
         error.textContent = err instanceof Error ? err.message : 'Unable to complete account sign in.'
@@ -111,7 +108,7 @@ async function showAccountModal(): Promise<boolean> {
       }
     })
     setMode('signin')
-    card.querySelector<HTMLInputElement>('[data-account="email"]')?.focus()
+    modal.querySelector<HTMLInputElement>('[data-account="email"]')?.focus()
   })
 }
 
@@ -124,28 +121,13 @@ async function restoreCustomerDetails(checkout: Element) {
   if (profile?.full_name) setField(checkout, 'name', profile.full_name)
   if (profile?.phone) setField(checkout, 'phone', profile.phone)
   if (user.email) setField(checkout, 'email', user.email)
-
   const { data: addresses } = await supabase.from('customer_addresses').select('id,label,recipient_name,phone,address,landmark,city,postal_code').eq('customer_id', user.id).order('is_default', { ascending: false }).order('created_at', { ascending: false })
   if (!addresses?.length || document.getElementById('saved-addresses')) return
-  const wrap = document.createElement('div')
-  wrap.id = 'saved-addresses'
-  wrap.className = 'saved-addresses'
-  wrap.innerHTML = `<strong>Saved delivery addresses</strong><div class="saved-address-list"></div>`
+  const wrap = document.createElement('div'); wrap.id = 'saved-addresses'; wrap.className = 'saved-addresses'; wrap.innerHTML = `<strong>Saved delivery addresses</strong><div class="saved-address-list"></div>`
   const list = wrap.querySelector('.saved-address-list') as HTMLElement
   ;(addresses as SavedAddress[]).forEach((address) => {
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'saved-address'
-    button.textContent = `${address.label}: ${address.address}, ${address.city} ${address.postal_code}`
-    button.addEventListener('click', () => {
-      setField(checkout, 'name', address.recipient_name)
-      setField(checkout, 'phone', address.phone)
-      setField(checkout, 'address', address.address)
-      setField(checkout, 'landmark', address.landmark || '')
-      setField(checkout, 'city', address.city)
-      setField(checkout, 'pin', address.postal_code)
-      checkout.querySelector<HTMLElement>('.toggle button:nth-child(2)')?.click()
-    })
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'saved-address'; button.textContent = `${address.label}: ${address.address}, ${address.city} ${address.postal_code}`
+    button.addEventListener('click', () => { setField(checkout, 'name', address.recipient_name); setField(checkout, 'phone', address.phone); setField(checkout, 'address', address.address); setField(checkout, 'landmark', address.landmark || ''); setField(checkout, 'city', address.city); setField(checkout, 'pin', address.postal_code); checkout.querySelector<HTMLElement>('.toggle button:nth-child(2)')?.click() })
     list.appendChild(button)
   })
   checkout.querySelector('.form-grid')?.prepend(wrap)
@@ -171,14 +153,10 @@ export default function CheckoutOrderSync() {
         if (!cart.length) throw new Error('Your cart is empty.')
         const items = cart.map((line) => ({ productSlug: line.product.slug, variantName: line.variant || undefined, quantity: Math.max(1, Math.floor(line.quantity)) }))
         const type = checkout.querySelector('.toggle button.active')?.textContent?.toLowerCase().includes('delivery') ? 'delivery' : 'pickup'
-        const date = fieldValue(checkout, 'date')
-        const time = fieldValue(checkout, 'time')
-        const phone = fieldValue(checkout, 'phone').replace(/\D/g, '')
-        const result = await createOrder({ customerName: fieldValue(checkout, 'name'), customerPhone: phone, customerEmail: fieldValue(checkout, 'email') || undefined, orderType: type, deliveryAddress: fieldValue(checkout, 'address') || undefined, landmark: fieldValue(checkout, 'landmark') || undefined, city: fieldValue(checkout, 'city') || undefined, postalCode: fieldValue(checkout, 'pin') || undefined, scheduledDate: date, scheduledTime: time, customerNote: fieldValue(checkout, 'note') || undefined, items })
+        const result = await createOrder({ customerName: fieldValue(checkout, 'name'), customerPhone: fieldValue(checkout, 'phone').replace(/\D/g, ''), customerEmail: fieldValue(checkout, 'email') || undefined, orderType: type, deliveryAddress: fieldValue(checkout, 'address') || undefined, landmark: fieldValue(checkout, 'landmark') || undefined, city: fieldValue(checkout, 'city') || undefined, postalCode: fieldValue(checkout, 'pin') || undefined, scheduledDate: fieldValue(checkout, 'date'), scheduledTime: fieldValue(checkout, 'time'), customerNote: fieldValue(checkout, 'note') || undefined, items })
         sessionStorage.setItem('last-order-request', JSON.stringify(result)); sessionStorage.setItem('checkout-order-sync-bypass', '1'); target.click()
       } catch (error) {
-        target.disabled = false
-        target.textContent = target.dataset.originalText || 'Create Order Request'
+        target.disabled = false; target.textContent = target.dataset.originalText || 'Create Order Request'
         window.alert(error instanceof Error ? error.message : 'Unable to save the order request. Please try again.')
       }
     }
