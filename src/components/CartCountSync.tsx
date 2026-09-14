@@ -12,29 +12,22 @@ export default function CartCountSync() {
   const [orders, setOrders] = useState<SavedOrder[]>(readOrders)
 
   useEffect(() => {
+    const openOrders = () => { setOrders(readOrders()); setOrdersOpen(true) }
     const sync = () => {
       try {
-        const raw = localStorage.getItem('bakery-cart') || '[]'
-        const cart = JSON.parse(raw) as Array<{ quantity?: number }>
+        const cart = JSON.parse(localStorage.getItem('bakery-cart') || '[]') as Array<{ quantity?: number }>
         const count = cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
         document.querySelectorAll<HTMLAnchorElement>('.cart-link').forEach((link) => {
           link.setAttribute('aria-label', `Cart, ${count} item${count === 1 ? '' : 's'}`)
           let badge = link.querySelector<HTMLElement>('b')
-          if (count > 0) {
-            if (!badge) { badge = document.createElement('b'); link.appendChild(badge) }
-            badge.textContent = String(count)
-          } else if (badge) badge.remove()
+          if (count > 0) { if (!badge) { badge = document.createElement('b'); link.appendChild(badge) }; badge.textContent = String(count) } else if (badge) badge.remove()
         })
-        document.querySelectorAll<HTMLElement>('.mobile-bar a[href$="/cart"], .mobile-bar a[href$="/cart/"]').forEach((link) => {
-          const label = link.querySelector('span')
-          if (label) label.textContent = count ? `Cart (${count})` : 'Cart'
-        })
+        document.querySelectorAll<HTMLElement>('.mobile-bar a[href$="/cart"], .mobile-bar a[href$="/cart/"]').forEach((link) => { const label = link.querySelector('span'); if (label) label.textContent = count ? `Cart (${count})` : 'Cart' })
       } catch { /* localStorage unavailable */ }
     }
 
     const finalizeOrderIfNeeded = () => {
-      const success = document.querySelector('.success h1')
-      if (!success) return
+      if (!document.querySelector('.success h1')) return
       try {
         const cart = JSON.parse(localStorage.getItem('bakery-cart') || '[]') as Array<{ product?: { name?: string }; variant?: string; price?: number; quantity?: number }>
         if (!cart.length) return
@@ -43,10 +36,7 @@ export default function CartCountSync() {
         const now = new Date()
         const order: SavedOrder = { id: `BF-${now.getTime().toString().slice(-8)}`, createdAt: now.toISOString(), items, subtotal, status: 'Request submitted · Awaiting bakery confirmation', editableUntil: new Date(now.getTime() + 15 * 60 * 1000).toISOString(), instructions: '', requestedTime: '' }
         const next = [order, ...readOrders()].slice(0, 20)
-        localStorage.setItem('bakery-orders', JSON.stringify(next))
-        localStorage.removeItem('bakery-cart')
-        setOrders(next)
-        sync()
+        localStorage.setItem('bakery-orders', JSON.stringify(next)); localStorage.removeItem('bakery-cart'); setOrders(next); sync()
       } catch { /* keep success screen usable */ }
     }
 
@@ -57,30 +47,27 @@ export default function CartCountSync() {
       if (!button) return
       const card = button.closest<HTMLElement>('.product-card')
       const mobileCart = document.querySelector<HTMLElement>('.mobile-bar a[href$="/cart"], .mobile-bar a[href$="/cart/"]')
-      button.classList.remove('is-added'); card?.classList.remove('is-added'); mobileCart?.classList.remove('cart-pulse')
-      void button.offsetWidth
+      button.classList.remove('is-added'); card?.classList.remove('is-added'); mobileCart?.classList.remove('cart-pulse'); void button.offsetWidth
       button.classList.add('is-added'); card?.classList.add('is-added'); mobileCart?.classList.add('cart-pulse')
       window.setTimeout(() => { button.classList.remove('is-added'); card?.classList.remove('is-added'); mobileCart?.classList.remove('cart-pulse') }, 950)
     }
 
     const addOrdersButton = () => {
       const host = document.querySelector('.nav-actions')
-      if (!host || host.querySelector('.orders-ui-btn')) return
-      const button = document.createElement('button')
-      button.className = 'orders-ui-btn'
-      button.type = 'button'
-      button.textContent = 'Orders'
-      button.setAttribute('aria-label', 'View my order requests')
-      button.addEventListener('click', () => { setOrders(readOrders()); setOrdersOpen(true) })
-      host.insertBefore(button, host.firstChild)
+      if (host && !host.querySelector('.orders-ui-btn')) {
+        const button = document.createElement('button'); button.className = 'orders-ui-btn'; button.type = 'button'; button.textContent = 'Orders'; button.setAttribute('aria-label', 'View my order requests'); button.addEventListener('click', openOrders); host.insertBefore(button, host.firstChild)
+      }
+      const mobileMenu = document.querySelector('.mobile-menu')
+      if (mobileMenu && !mobileMenu.querySelector('.orders-mobile-btn')) {
+        const button = document.createElement('button'); button.className = 'orders-ui-btn orders-mobile-btn'; button.type = 'button'; button.textContent = 'My Orders'; button.addEventListener('click', openOrders); mobileMenu.insertBefore(button, mobileMenu.firstChild)
+      }
     }
 
     sync(); finalizeOrderIfNeeded(); addOrdersButton()
     const timer = window.setInterval(() => { sync(); finalizeOrderIfNeeded(); addOrdersButton() }, 400)
     const observer = new MutationObserver(() => { finalizeOrderIfNeeded(); addOrdersButton() })
     observer.observe(document.body, { childList: true, subtree: true })
-    window.addEventListener('storage', sync)
-    document.addEventListener('click', animateAdd)
+    window.addEventListener('storage', sync); document.addEventListener('click', animateAdd)
     return () => { window.clearInterval(timer); observer.disconnect(); window.removeEventListener('storage', sync); document.removeEventListener('click', animateAdd) }
   }, [])
 
