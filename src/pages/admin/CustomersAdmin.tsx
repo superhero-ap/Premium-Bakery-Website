@@ -5,7 +5,6 @@ import { supabase } from '../../lib/supabase'
 
 type Customer = { id:string; full_name:string|null; phone:string|null; cashback_balance:number; created_at:string }
 type DiscountRequest = { id:string; customer_id:string; order_id:string|null; request_note:string; status:string; requested_at:string; customer?:Customer|null }
-const money=(n:number)=>`₹${Number(n).toLocaleString('en-IN')}`
 
 export default function CustomersAdmin(){
  const [customers,setCustomers]=useState<Customer[]>([]); const [requests,setRequests]=useState<DiscountRequest[]>([]); const [loading,setLoading]=useState(true); const [message,setMessage]=useState(''); const [saving,setSaving]=useState<string|null>(null)
