@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { products, type Product } from '../data/demo'
 
 type OrderItem = { product_name_snapshot: string; variant_name_snapshot: string | null; quantity: number; unit_price: number }
 type Order = { id: string; order_number: string; status: string; subtotal: number; discount_amount: number; delivery_fee: number; total_amount: number; customer_note: string | null; scheduled_date: string | null; scheduled_time: string | null; created_at: string; order_items: OrderItem[] }
-
 type Props = { onClose: () => void }
 const money = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
@@ -34,21 +33,14 @@ export default function CustomerPortal({ onClose }: Props) {
 
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      if (data.session?.user) loadAccount(data.session.user.id)
-    })
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next)
-      if (next?.user) loadAccount(next.user.id)
-      else { setOrders([]); setCashback(0) }
-    })
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); if (data.session?.user) loadAccount(data.session.user.id) })
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => { setSession(next); if (next?.user) loadAccount(next.user.id); else { setOrders([]); setCashback(0) } })
     return () => data.subscription.unsubscribe()
   }, [])
 
   if (!supabase) return <div className="account-overlay"><div className="account-panel"><button className="orders-close" onClick={onClose} aria-label="Close">×</button><h2>Customer account</h2><p>Customer login is not configured yet. Add the Supabase environment variables to enable it.</p></div></div>
 
-  const submitAuth = async (event: React.FormEvent) => {
+  const submitAuth = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setMessage('')
     const cleanPhone = phone.replace(/\D/g, '')
     try {
@@ -82,7 +74,7 @@ export default function CustomerPortal({ onClose }: Props) {
     } catch { setMessage('Could not restore this order.') }
   }
 
-  const submitDiscountRequest = async (event: React.FormEvent) => {
+  const submitDiscountRequest = async (event: FormEvent) => {
     event.preventDefault(); if (!discountOrder) return
     setBusy(true); setMessage('')
     const { error } = await supabase.rpc('request_discount', { payload: { orderId: discountOrder, note: discountNote } })
