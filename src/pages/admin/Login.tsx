@@ -44,13 +44,9 @@ export default function AdminLogin() {
       return
     }
 
-    const user = result.data.user
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('is_active,role')
-      .eq('id', user.id)
-      .maybeSingle()
-    const allowed = !profileError && Boolean(
+    const { data: access, error: accessError } = await supabase.rpc('get_my_staff_access')
+    const profile = Array.isArray(access) ? access[0] : access
+    const allowed = !accessError && Boolean(
       profile?.is_active && ['owner', 'admin', 'manager', 'staff'].includes(profile.role),
     )
 
