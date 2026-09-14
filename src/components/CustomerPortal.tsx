@@ -13,7 +13,7 @@ const phoneE164 = (v: string) => `+91${phoneDigits(v)}`
 export default function CustomerPortal({ onClose }: Props) {
   const [session, setSession] = useState<Session | null>(null)
   const [mode, setMode] = useState<'login' | 'signup'>('login')
-  const [method, setMethod] = useState<'email' | 'phone'>('email')
+  const [method, setMethod] = useState<'email' | 'phone'>('phone')
   const [email, setEmail] = useState(''); const [phone, setPhone] = useState(''); const [name, setName] = useState('')
   const [password, setPassword] = useState(''); const [confirmPassword, setConfirmPassword] = useState('')
   const [orders, setOrders] = useState<Order[]>([]); const [cashback, setCashback] = useState(0)
@@ -46,7 +46,7 @@ export default function CustomerPortal({ onClose }: Props) {
         if (mode === 'signup') {
           const { data, error } = await supabase.auth.signUp({ phone: phoneValue, password, options: { data: { full_name: name.trim(), phone: phoneValue } } })
           if (error) throw error; if (!data.user) throw new Error('Account could not be created.')
-          if (!data.session) throw new Error('Mobile confirmation is enabled. Disable phone confirmation in the authentication settings for password-only mobile login.')
+          if (!data.session) throw new Error('Mobile confirmation is enabled. Please complete the confirmation before signing in.')
           await supabase.from('customer_profiles').upsert({ id: data.user.id, full_name: name.trim(), phone: phoneValue }, { onConflict: 'id' })
           setMessage('Account created successfully.')
         } else {
@@ -56,12 +56,15 @@ export default function CustomerPortal({ onClose }: Props) {
         const value = email.trim(); if (!value) throw new Error('Enter your email address.')
         const { data, error } = await supabase.auth.signUp({ email: value, password, options: { data: { full_name: name.trim(), phone: phoneDigits(phone) } } })
         if (error) throw error; if (!data.user) throw new Error('Account could not be created.')
-        if (!data.session) throw new Error('Email confirmation is enabled. Disable email confirmation in the authentication settings for password-only login.')
+        if (!data.session) throw new Error('Email confirmation is enabled. Please complete the confirmation before signing in.')
         await supabase.from('customer_profiles').upsert({ id: data.user.id, full_name: name.trim(), phone: phoneDigits(phone) }, { onConflict: 'id' }); setMessage('Account created successfully.')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password }); if (error) throw error; setMessage('Signed in successfully.')
       }
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to continue.') } finally { setBusy(false) }
+    } catch (error) {
+      const text = error instanceof Error ? error.message : 'Unable to continue.'
+      setMessage(text.toLowerCase().includes('rate limit') ? 'Too many signup attempts right now. Please wait a while, then try again, or use Mobile + password.' : text)
+    } finally { setBusy(false) }
   }
 
   const reorder = (order: Order) => {
