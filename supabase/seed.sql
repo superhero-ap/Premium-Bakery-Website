@@ -1,0 +1,3 @@
+-- Demo seed intentionally contains no passwords, private customer data, verified reviews, phone numbers or coordinates.
+-- Product/category demo content currently lives in src/data/demo.ts for a zero-credential sales demo.
+-- For production, import only verified business/catalogue data through an authenticated admin workflow.
