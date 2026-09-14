@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import CustomerPortal from './CustomerPortal'
+import CustomerPasswordPortal from './CustomerPasswordPortal'
 
 export default function CustomerAccountHost() {
   const [open, setOpen] = useState(false)
@@ -10,6 +10,6 @@ export default function CustomerAccountHost() {
   }, [])
   return <>
     <button className="account-trigger" type="button" onClick={() => setOpen(true)} aria-label="Open customer account">Account</button>
-    {open ? <CustomerPortal onClose={() => setOpen(false)} /> : null}
+    {open ? <CustomerPasswordPortal onClose={() => setOpen(false)} /> : null}
   </>
 }
