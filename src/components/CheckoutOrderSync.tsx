@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 
 type CartLine = { product: { slug: string; name: string }; variant?: string; quantity: number }
 const fieldValue = (root: ParentNode, keyword: string) => { const label = Array.from(root.querySelectorAll('label')).find((node) => node.textContent?.toLowerCase().includes(keyword)); return (label?.querySelector('input, textarea') as HTMLInputElement | HTMLTextAreaElement | null)?.value.trim() || '' }
+const normalizeDate = (value: string) => { const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return match ? `${match[3]}-${match[2]}-${match[1]}` : value }
+const normalizeTime = (value: string) => { const match = value.match(/^(\d{1,2}):(\d{2})$/); return match ? `${match[1].padStart(2, '0')}:${match[2]}` : value }
 
 export default function CheckoutOrderSync() {
   useEffect(() => {
@@ -17,13 +19,22 @@ export default function CheckoutOrderSync() {
       try {
         const cart = JSON.parse(localStorage.getItem('bakery-cart') || '[]') as CartLine[]
         if (!cart.length) throw new Error('Your cart is empty.')
-        const items = cart.map((line) => ({
-          productSlug: line.product.slug,
-          variantName: line.variant || undefined,
-          quantity: Math.max(1, Math.floor(line.quantity)),
-        }))
+        const items = cart.map((line) => ({ productSlug: line.product.slug, variantName: line.variant || undefined, quantity: Math.max(1, Math.floor(line.quantity)) }))
         const type = checkout.querySelector('.toggle button.active')?.textContent?.toLowerCase().includes('delivery') ? 'delivery' : 'pickup'
-        const result = await createOrder({ customerName: fieldValue(checkout, 'name'), customerPhone: fieldValue(checkout, 'phone').replace(/\D/g, ''), customerEmail: fieldValue(checkout, 'email') || undefined, orderType: type, deliveryAddress: fieldValue(checkout, 'address') || undefined, landmark: fieldValue(checkout, 'landmark') || undefined, city: fieldValue(checkout, 'city') || undefined, postalCode: fieldValue(checkout, 'pin') || undefined, scheduledDate: fieldValue(checkout, 'date') || undefined, scheduledTime: fieldValue(checkout, 'time') || undefined, customerNote: fieldValue(checkout, 'note') || undefined, items })
+        const result = await createOrder({
+          customerName: fieldValue(checkout, 'name'),
+          customerPhone: fieldValue(checkout, 'phone').replace(/\D/g, ''),
+          customerEmail: fieldValue(checkout, 'email') || undefined,
+          orderType: type,
+          deliveryAddress: fieldValue(checkout, 'address') || undefined,
+          landmark: fieldValue(checkout, 'landmark') || undefined,
+          city: fieldValue(checkout, 'city') || undefined,
+          postalCode: fieldValue(checkout, 'pin') || undefined,
+          scheduledDate: normalizeDate(fieldValue(checkout, 'date')) || undefined,
+          scheduledTime: normalizeTime(fieldValue(checkout, 'time')) || undefined,
+          customerNote: fieldValue(checkout, 'note') || undefined,
+          items,
+        })
         sessionStorage.setItem('last-order-request', JSON.stringify(result)); sessionStorage.setItem('checkout-order-sync-bypass', '1'); target.click()
       } catch (error) { target.disabled = false; target.textContent = target.dataset.originalText || 'Place order request'; window.alert(error instanceof Error ? error.message : 'Unable to save the order request. Please try again.') }
     }
