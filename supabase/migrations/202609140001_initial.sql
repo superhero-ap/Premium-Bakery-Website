@@ -1,0 +1,70 @@
+create extension if not exists pgcrypto;
+
+create table if not exists public.profiles (id uuid primary key references auth.users(id) on delete cascade, name text, role text not null default 'staff' check (role in ('owner','admin','manager','staff')), is_active boolean not null default true, created_at timestamptz not null default now());
+create table if not exists public.business_settings (id uuid primary key default gen_random_uuid(), business_name text not null, tagline text, logo_url text, favicon_url text, description text, phone text, whatsapp text, email text, address text, city text, state text, postal_code text, maps_url text, latitude numeric, longitude numeric, timezone text not null default 'Asia/Kolkata', currency text not null default 'INR', delivery_enabled boolean not null default false, pickup_enabled boolean not null default true, delivery_charge numeric not null default 0 check(delivery_charge>=0), minimum_order numeric not null default 0 check(minimum_order>=0), hero_content jsonb not null default '{}'::jsonb, opening_hours jsonb not null default '[]'::jsonb, social_links jsonb not null default '{}'::jsonb, seo_title text, seo_description text, og_image_url text, payment_enabled boolean not null default false, updated_at timestamptz not null default now());
+create table if not exists public.categories (id uuid primary key default gen_random_uuid(), name text not null, slug text unique not null, description text, image_url text, is_active boolean not null default true, sort_order integer not null default 0, created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+create table if not exists public.products (id uuid primary key default gen_random_uuid(), category_id uuid references public.categories(id) on delete set null, name text not null, slug text unique not null, short_description text, description text, base_price numeric not null check(base_price>=0), compare_at_price numeric check(compare_at_price is null or compare_at_price>=base_price), is_featured boolean not null default false, is_best_seller boolean not null default false, is_available boolean not null default true, is_active boolean not null default true, sort_order integer not null default 0, tags text[] not null default '{}', ingredients text[] not null default '{}', allergens text[] not null default '{}', preparation_note text, seo_title text, seo_description text, created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+create table if not exists public.product_variants (id uuid primary key default gen_random_uuid(), product_id uuid not null references public.products(id) on delete cascade, name text not null, price numeric not null check(price>=0), available boolean not null default true, sort_order integer not null default 0);
+create table if not exists public.product_images (id uuid primary key default gen_random_uuid(), product_id uuid not null references public.products(id) on delete cascade, image_url text not null, alt_text text, sort_order integer not null default 0);
+create table if not exists public.orders (id uuid primary key default gen_random_uuid(), order_number text unique not null, customer_name text not null, customer_phone text not null, customer_email text, order_type text not null check(order_type in ('pickup','delivery')), delivery_address text, landmark text, city text, postal_code text, scheduled_date date, scheduled_time time, subtotal numeric not null check(subtotal>=0), discount_amount numeric not null default 0 check(discount_amount>=0), delivery_fee numeric not null default 0 check(delivery_fee>=0), total_amount numeric not null check(total_amount>=0), status text not null default 'draft' check(status in ('draft','submitted','awaiting_confirmation','confirmed','preparing','ready','out_for_delivery','completed','cancelled')), payment_status text not null default 'unpaid' check(payment_status in ('unpaid','pending','paid','failed','refunded')), customer_note text, created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+create table if not exists public.order_items (id uuid primary key default gen_random_uuid(), order_id uuid not null references public.orders(id) on delete cascade, product_id uuid references public.products(id) on delete set null, product_name_snapshot text not null, variant_name_snapshot text, quantity integer not null check(quantity>0), unit_price numeric not null check(unit_price>=0), line_total numeric not null check(line_total>=0));
+create table if not exists public.custom_cake_requests (id uuid primary key default gen_random_uuid(), customer_name text not null, phone text not null, email text, occasion text not null, flavour text not null, weight text not null, theme text, cake_message text, colour_preference text, special_instructions text, reference_image_url text, required_date date not null, preferred_time time not null, status text not null default 'new' check(status in ('new','reviewing','quoted','confirmed','in_progress','completed','cancelled')), created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+create table if not exists public.offers (id uuid primary key default gen_random_uuid(), title text not null, description text, discount_type text not null check(discount_type in ('percentage','fixed')), discount_value numeric not null check(discount_value>0), start_date date not null, end_date date not null, image_url text, active boolean not null default false, featured boolean not null default false, constraint valid_offer_dates check(end_date>=start_date), constraint valid_percentage check(discount_type!='percentage' or discount_value<=100));
+create table if not exists public.offer_products (offer_id uuid references public.offers(id) on delete cascade, product_id uuid references public.products(id) on delete cascade, primary key(offer_id,product_id));
+create table if not exists public.offer_categories (offer_id uuid references public.offers(id) on delete cascade, category_id uuid references public.categories(id) on delete cascade, primary key(offer_id,category_id));
+create table if not exists public.gallery_images (id uuid primary key default gen_random_uuid(), image_url text not null, caption text, alt_text text not null, category text, is_published boolean not null default true, sort_order integer not null default 0, created_at timestamptz not null default now());
+create table if not exists public.reviews (id uuid primary key default gen_random_uuid(), author_name text not null, rating integer not null check(rating between 1 and 5), comment text not null, source text, is_demo boolean not null default false, is_published boolean not null default false, created_at timestamptz not null default now());
+create table if not exists public.audit_logs (id uuid primary key default gen_random_uuid(), actor_id uuid references auth.users(id) on delete set null, action text not null, entity_type text not null, entity_id uuid, metadata jsonb not null default '{}'::jsonb, created_at timestamptz not null default now());
+
+create index if not exists products_category_idx on public.products(category_id,is_active,sort_order);
+create index if not exists orders_status_date_idx on public.orders(status,scheduled_date);
+create index if not exists custom_cakes_status_date_idx on public.custom_cake_requests(status,required_date);
+
+create or replace function public.is_staff() returns boolean language sql stable security definer set search_path=public as $$ select exists(select 1 from public.profiles where id=auth.uid() and is_active=true and role in ('owner','admin','manager','staff')); $$;
+create or replace function public.is_admin() returns boolean language sql stable security definer set search_path=public as $$ select exists(select 1 from public.profiles where id=auth.uid() and is_active=true and role in ('owner','admin')); $$;
+
+alter table public.profiles enable row level security;
+alter table public.business_settings enable row level security;
+alter table public.categories enable row level security;
+alter table public.products enable row level security;
+alter table public.product_variants enable row level security;
+alter table public.product_images enable row level security;
+alter table public.orders enable row level security;
+alter table public.order_items enable row level security;
+alter table public.custom_cake_requests enable row level security;
+alter table public.offers enable row level security;
+alter table public.offer_products enable row level security;
+alter table public.offer_categories enable row level security;
+alter table public.gallery_images enable row level security;
+alter table public.reviews enable row level security;
+alter table public.audit_logs enable row level security;
+
+create policy "public read business" on public.business_settings for select using (true);
+create policy "public read categories" on public.categories for select using (is_active=true);
+create policy "public read products" on public.products for select using (is_active=true);
+create policy "public read variants" on public.product_variants for select using (available=true);
+create policy "public read product images" on public.product_images for select using (true);
+create policy "public read gallery" on public.gallery_images for select using (is_published=true);
+create policy "public read reviews" on public.reviews for select using (is_published=true);
+create policy "public read offers" on public.offers for select using (active=true and current_date between start_date and end_date);
+create policy "public read offer products" on public.offer_products for select using (exists(select 1 from public.offers o where o.id=offer_id and o.active=true));
+create policy "public read offer categories" on public.offer_categories for select using (exists(select 1 from public.offers o where o.id=offer_id and o.active=true));
+
+create policy "staff profiles" on public.profiles for select using (id=auth.uid() or is_admin());
+create policy "admin business" on public.business_settings for all using (is_admin()) with check (is_admin());
+create policy "admin categories" on public.categories for all using (is_admin()) with check (is_admin());
+create policy "admin products" on public.products for all using (is_admin()) with check (is_admin());
+create policy "admin variants" on public.product_variants for all using (is_admin()) with check (is_admin());
+create policy "admin product images" on public.product_images for all using (is_admin()) with check (is_admin());
+create policy "staff orders read" on public.orders for select using (is_staff());
+create policy "staff order update" on public.orders for update using (is_staff()) with check (is_staff());
+create policy "admin order items" on public.order_items for all using (is_staff()) with check (is_staff());
+create policy "staff cakes" on public.custom_cake_requests for select using (is_staff());
+create policy "staff cakes update" on public.custom_cake_requests for update using (is_staff()) with check (is_staff());
+create policy "admin offers" on public.offers for all using (is_admin()) with check (is_admin());
+create policy "admin offer products" on public.offer_products for all using (is_admin()) with check (is_admin());
+create policy "admin offer categories" on public.offer_categories for all using (is_admin()) with check (is_admin());
+create policy "admin gallery" on public.gallery_images for all using (is_admin()) with check (is_admin());
+create policy "admin reviews" on public.reviews for all using (is_admin()) with check (is_admin());
+create policy "admin audit" on public.audit_logs for select using (is_admin());
+create policy "admin audit insert" on public.audit_logs for insert with check (is_admin());
