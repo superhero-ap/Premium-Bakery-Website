@@ -1,6 +1,12 @@
 import { supabase } from './supabase'
 
-export type OrderItemInput = { productId: string; variantId?: string; quantity: number }
+export type OrderItemInput = {
+  productId?: string
+  productSlug?: string
+  variantId?: string
+  variantName?: string
+  quantity: number
+}
 export type OrderInput = { customerName: string; customerPhone: string; customerEmail?: string; orderType: 'pickup' | 'delivery'; deliveryAddress?: string; landmark?: string; city?: string; postalCode?: string; scheduledDate?: string; scheduledTime?: string; customerNote?: string; items: OrderItemInput[] }
 
 export async function createOrder(input: OrderInput) {
