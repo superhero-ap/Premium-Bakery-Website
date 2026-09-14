@@ -23,3 +23,11 @@ body{background:var(--cream);color:var(--ink)}
 .admin-card{background:var(--paper);border-color:var(--line)}
 input,textarea,select{border-color:var(--line);background:var(--paper)}
 :focus-visible{outline-color:#064E3B}
+.password-field,.checkout-password-field{position:relative;display:block}
+.password-field input,.checkout-password-field input{padding-right:3rem}
+.password-eye,.checkout-password-eye{position:absolute;right:.65rem;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;border:0;background:transparent;color:#064E3B;cursor:pointer;border-radius:.5rem}
+.password-eye:hover,.checkout-password-eye:hover{background:rgba(6,78,59,.08)}
+.password-eye:focus-visible,.checkout-password-eye:focus-visible{outline:2px solid #064E3B;outline-offset:2px}
+.checkout-account-methods{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin:.75rem 0 1rem}
+.checkout-account-methods button{padding:.75rem;border:1px solid var(--line);border-radius:.65rem;background:var(--paper);color:var(--ink);font-weight:700;cursor:pointer}
+.checkout-account-methods button.active{background:#064E3B;color:#F8E7C9}
