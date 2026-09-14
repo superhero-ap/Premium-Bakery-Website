@@ -1,0 +1,25 @@
+:root{
+  --ink:#064E3B;
+  --deep:#064E3B;
+  --accent:#064E3B;
+  --cream:#F8E7C9;
+  --paper:#FFFDF7;
+  --line:#DCC9A5;
+  --muted:#5F6B62;
+}
+body{background:var(--cream);color:var(--ink)}
+.header{background:rgba(248,231,201,.96);border-bottom-color:var(--line)}
+.announcement{background:#064E3B;color:#F8E7C9}
+.nav-order,.btn.primary,.toggle button.active,.category-pills a.active{background:#064E3B;color:#F8E7C9}
+.cart-link b{background:#064E3B;color:#F8E7C9}
+.btn.secondary{border-color:#DCC9A5;color:#064E3B}
+.hero{background:#064E3B}
+.section.soft,.info-note{background:#F8E7C9}
+.info-note{color:#3E5146}
+.footer,.mobile-bar{background:#064E3B;color:#F8E7C9}
+.footer a,.mobile-bar a{color:#F8E7C9}
+.success-icon{background:#064E3B;color:#F8E7C9}
+.admin-shell,.admin-header{background:var(--cream)}
+.admin-card{background:var(--paper);border-color:var(--line)}
+input,textarea,select{border-color:var(--line);background:var(--paper)}
+:focus-visible{outline-color:#064E3B}
