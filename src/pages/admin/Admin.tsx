@@ -15,12 +15,16 @@ function Gate() {
     const check = async () => {
       const { data: auth } = await supabase.auth.getUser()
       if (!auth.user) { if (alive) setState('signed-out'); return }
-      const { data: profile } = await supabase.from('profiles').select('is_active,role').eq('id', auth.user.id).maybeSingle()
-      const allowed = Boolean(profile?.is_active && ['owner', 'admin', 'manager', 'staff'].includes(profile.role))
+      const { data: access, error: accessError } = await supabase.rpc('get_my_staff_access')
+      const profile = Array.isArray(access) ? access[0] : access
+      const allowed = !accessError && Boolean(profile?.is_active && ['owner', 'admin', 'manager', 'staff'].includes(profile.role))
       if (alive) setState(allowed ? 'allowed' : 'signed-out')
     }
     void check()
-    const { data } = supabase.auth.onAuthStateChange(() => { void check() })
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') setState('signed-out')
+      else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') void check()
+    })
     return () => { alive = false; data.subscription.unsubscribe() }
   }, [])
   if (state === 'loading') return <div className="page"><div className="container narrow simple"><div className="eyebrow">ADMIN</div><h1>Checking access…</h1><p>Verifying your authenticated staff session.</p></div></div>
